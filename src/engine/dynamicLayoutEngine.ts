@@ -366,7 +366,7 @@ export function generateBulkTopology(
   arch: BulkArchitecture,
   totalNodes: number = 30
 ): { nodes: Record<string, NetworkNode>; links: NetworkLink[] } {
-  const count = Math.max(6, Math.min(100, totalNodes));
+  const count = Math.max(2, Math.min(100, totalNodes));
   const nodes: Record<string, NetworkNode> = {};
   const links: NetworkLink[] = [];
 
@@ -410,11 +410,27 @@ export function generateBulkTopology(
   });
 
   if (arch === 'enterprise') {
-    // Ratio: ~15% Cores, ~25% Switches, ~30% Edges, ~30% Hosts
-    const nCore = Math.max(2, Math.floor(count * 0.15));
-    const nSwitch = Math.max(2, Math.floor(count * 0.25));
-    const nEdge = Math.max(2, Math.floor(count * 0.30));
-    const nHost = count - (nCore + nSwitch + nEdge);
+    let nCore = 1;
+    let nSwitch = 0;
+    let nEdge = 0;
+    let nHost = 0;
+
+    if (count <= 2) {
+      nCore = 1;
+      nHost = 1;
+    } else if (count <= 4) {
+      nCore = 1;
+      nSwitch = 1;
+      nEdge = 1;
+      nHost = 1;
+    } else {
+      nCore = Math.max(2, Math.floor(count * 0.15));
+      nSwitch = Math.max(1, Math.floor(count * 0.25));
+      nEdge = Math.max(1, Math.floor(count * 0.30));
+      nHost = Math.max(1, count - (nCore + nSwitch + nEdge));
+      const diff = count - (nCore + nSwitch + nEdge + nHost);
+      nHost += diff;
+    }
 
     // Cores
     for (let i = 1; i <= nCore; i++) {
@@ -447,65 +463,93 @@ export function generateBulkTopology(
       }
     }
 
-    // Switches
-    for (let i = 1; i <= nSwitch; i++) {
-      const id = `s${i}`;
-      nodes[id] = createDefaultNode(id, id, 'switch');
-      // Connect each switch to an assigned core router
-      const assignedCore = `r${((i - 1) % nCore) + 1}`;
+    // If count=2, directly connect core router and host
+    if (nSwitch === 0 && nEdge === 0 && nHost > 0) {
+      nodes['h1'] = createDefaultNode('h1', 'h1', 'host');
       links.push({
-        id: `link-${assignedCore}-${id}`,
-        source: assignedCore,
-        sourceHandle: `${assignedCore}-eth2`,
-        target: id,
-        targetHandle: `${id}-eth1`,
-        status: 'up',
-        latency: 0.2,
-        type: 'straight',
-        style: { stroke: '#64748b', strokeWidth: 2 }
-      });
-    }
-
-    // Edge Routers
-    for (let i = 1; i <= nEdge; i++) {
-      const id = `re${i}`;
-      nodes[id] = createDefaultNode(id, id, 'router', 'edge');
-      const assignedSwitch = `s${((i - 1) % nSwitch) + 1}`;
-      links.push({
-        id: `link-${assignedSwitch}-${id}`,
-        source: assignedSwitch,
-        sourceHandle: `${assignedSwitch}-eth2`,
-        target: id,
-        targetHandle: `${id}-eth1`,
+        id: `link-r1-h1`,
+        source: 'r1',
+        sourceHandle: 'r1-eth2',
+        target: 'h1',
+        targetHandle: 'h1-eth1',
         status: 'up',
         latency: 0.3,
         type: 'straight',
         style: { stroke: '#64748b', strokeWidth: 2 }
       });
-    }
+    } else {
+      // Switches
+      for (let i = 1; i <= nSwitch; i++) {
+        const id = `s${i}`;
+        nodes[id] = createDefaultNode(id, id, 'switch');
+        const assignedCore = `r${((i - 1) % nCore) + 1}`;
+        links.push({
+          id: `link-${assignedCore}-${id}`,
+          source: assignedCore,
+          sourceHandle: `${assignedCore}-eth2`,
+          target: id,
+          targetHandle: `${id}-eth1`,
+          status: 'up',
+          latency: 0.2,
+          type: 'straight',
+          style: { stroke: '#64748b', strokeWidth: 2 }
+        });
+      }
 
-    // Hosts
-    for (let i = 1; i <= nHost; i++) {
-      const id = `h${i}`;
-      nodes[id] = createDefaultNode(id, id, 'host');
-      const assignedEdge = `re${((i - 1) % nEdge) + 1}`;
-      links.push({
-        id: `link-${assignedEdge}-${id}`,
-        source: assignedEdge,
-        sourceHandle: `${assignedEdge}-eth2`,
-        target: id,
-        targetHandle: `${id}-eth1`,
-        status: 'up',
-        latency: 0.4,
-        type: 'straight',
-        style: { stroke: '#64748b', strokeWidth: 2 }
-      });
+      // Edge Routers
+      for (let i = 1; i <= nEdge; i++) {
+        const id = `re${i}`;
+        nodes[id] = createDefaultNode(id, id, 'router', 'edge');
+        const assignedSwitch = `s${((i - 1) % (nSwitch || 1)) + 1}`;
+        links.push({
+          id: `link-${assignedSwitch}-${id}`,
+          source: assignedSwitch,
+          sourceHandle: `${assignedSwitch}-eth2`,
+          target: id,
+          targetHandle: `${id}-eth1`,
+          status: 'up',
+          latency: 0.3,
+          type: 'straight',
+          style: { stroke: '#64748b', strokeWidth: 2 }
+        });
+      }
+
+      // Hosts
+      for (let i = 1; i <= nHost; i++) {
+        const id = `h${i}`;
+        nodes[id] = createDefaultNode(id, id, 'host');
+        const assignedEdge = `re${((i - 1) % (nEdge || 1)) + 1}`;
+        links.push({
+          id: `link-${assignedEdge}-${id}`,
+          source: assignedEdge,
+          sourceHandle: `${assignedEdge}-eth2`,
+          target: id,
+          targetHandle: `${id}-eth1`,
+          status: 'up',
+          latency: 0.4,
+          type: 'straight',
+          style: { stroke: '#64748b', strokeWidth: 2 }
+        });
+      }
     }
   } else if (arch === 'spine-leaf') {
-    // Bipartite Spine-Leaf topology
-    const nSpine = Math.max(2, Math.floor(count * 0.25));
-    const nLeaf = Math.max(2, Math.floor(count * 0.35));
-    const nServer = count - (nSpine + nLeaf);
+    let nSpine = 1;
+    let nLeaf = 1;
+    let nServer = 0;
+    if (count <= 2) {
+      nSpine = 1;
+      nLeaf = 1;
+      nServer = 0;
+    } else if (count <= 4) {
+      nSpine = 1;
+      nLeaf = 1;
+      nServer = 2;
+    } else {
+      nSpine = Math.max(2, Math.floor(count * 0.25));
+      nLeaf = Math.max(2, Math.floor(count * 0.35));
+      nServer = Math.max(1, count - (nSpine + nLeaf));
+      nServer += (count - (nSpine + nLeaf + nServer));
+    }
 
     // Spines
     for (let i = 1; i <= nSpine; i++) {

@@ -20,6 +20,7 @@ import {
   RefreshCw,
   Sliders,
   Check,
+  Trash2,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -33,6 +34,7 @@ export const Sidebar: React.FC = () => {
   const selectedGuideId = useNetworkStore(state => state.selectedGuideId);
   const setSelectedGuide = useNetworkStore(state => state.setSelectedGuide);
   const addNode = useNetworkStore(state => state.addNode);
+  const removeNode = useNetworkStore(state => state.removeNode);
 
   // Layout Engine & Preset actions
   const autoSnapOnCli = useNetworkStore(state => state.autoSnapOnCli);
@@ -181,7 +183,7 @@ export const Sidebar: React.FC = () => {
                         selectNode(n.id);
                         openTerminal(n.id);
                       }}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
+                      className={`group/item flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
                         selectedNodeId === n.id
                           ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 font-semibold border border-blue-200 dark:border-blue-800'
                           : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -200,9 +202,21 @@ export const Sidebar: React.FC = () => {
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
-                        {n.interfaces['lo']?.ip?.split('/')[0] || '1.1.1.1'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                          {n.interfaces['lo']?.ip?.split('/')[0] || '1.1.1.1'}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeNode(n.id);
+                          }}
+                          className="opacity-0 group-hover/item:opacity-100 p-0.5 text-slate-400 hover:text-rose-500 rounded transition-opacity"
+                          title={`Hapus ${n.name}`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -234,16 +248,28 @@ export const Sidebar: React.FC = () => {
                         selectNode(n.id);
                         openTerminal(n.id);
                       }}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
+                      className={`group/item flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
                         selectedNodeId === n.id
                           ? 'bg-sky-50 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 font-semibold border border-sky-200 dark:border-sky-800'
                           : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                       }`}
                     >
                       <span className="font-mono">{n.name}</span>
-                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
-                        {Object.values(n.interfaces)[0]?.ip?.split('/')[0] || '-'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
+                          {Object.values(n.interfaces)[0]?.ip?.split('/')[0] || '-'}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeNode(n.id);
+                          }}
+                          className="opacity-0 group-hover/item:opacity-100 p-0.5 text-slate-400 hover:text-rose-500 rounded transition-opacity"
+                          title={`Hapus ${n.name}`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -275,16 +301,28 @@ export const Sidebar: React.FC = () => {
                         selectNode(n.id);
                         openTerminal(n.id);
                       }}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
+                      className={`group/item flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
                         selectedNodeId === n.id
                           ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-900 dark:text-amber-300 font-semibold border border-amber-200 dark:border-amber-800'
                           : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                       }`}
                     >
                       <span className="font-mono">{n.name}</span>
-                      <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                        VLAN {Object.values(n.interfaces).map(i => i.vlanTag).filter(Boolean).join(', ')}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                          VLAN {Object.values(n.interfaces).map(i => i.vlanTag).filter(Boolean).join(', ')}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeNode(n.id);
+                          }}
+                          className="opacity-0 group-hover/item:opacity-100 p-0.5 text-slate-400 hover:text-rose-500 rounded transition-opacity"
+                          title={`Hapus ${n.name}`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -316,16 +354,28 @@ export const Sidebar: React.FC = () => {
                         selectNode(n.id);
                         openTerminal(n.id);
                       }}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
+                      className={`group/item flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
                         selectedNodeId === n.id
                           ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-300 font-semibold border border-emerald-200 dark:border-emerald-800'
                           : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                       }`}
                     >
                       <span className="font-mono">{n.name}</span>
-                      <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
-                        {Object.values(n.interfaces)[0]?.ip?.split('/')[0] || '-'}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                          {Object.values(n.interfaces)[0]?.ip?.split('/')[0] || '-'}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeNode(n.id);
+                          }}
+                          className="opacity-0 group-hover/item:opacity-100 p-0.5 text-slate-400 hover:text-rose-500 rounded transition-opacity"
+                          title={`Hapus ${n.name}`}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -464,7 +514,7 @@ export const Sidebar: React.FC = () => {
             <div className="flex items-center gap-1.5 mb-2.5">
               <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
               <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                Bulk Generator (10–100 Nodes)
+                Bulk Generator (2–100 Nodes)
               </h4>
             </div>
 
@@ -484,22 +534,35 @@ export const Sidebar: React.FC = () => {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1.5">
                   <label className="text-slate-600 dark:text-slate-400 font-medium">Jumlah Total Node</label>
-                  <span className="font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/40 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800 text-[11px]">
-                    {bulkCount} Nodes
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={2}
+                      max={100}
+                      step={2}
+                      value={bulkCount}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val)) setBulkCount(Math.max(2, Math.min(100, val)));
+                      }}
+                      className="w-16 px-1.5 py-0.5 text-center font-mono font-bold text-blue-600 dark:text-blue-400 bg-white dark:bg-slate-800 border border-blue-200 dark:border-blue-800 rounded text-xs outline-none focus:border-blue-500"
+                    />
+                    <span className="text-[10px] text-slate-400 font-mono">Nodes</span>
+                  </div>
                 </div>
                 <input
                   type="range"
-                  min={10}
+                  min={2}
                   max={100}
-                  step={5}
+                  step={2}
                   value={bulkCount}
                   onChange={(e) => setBulkCount(parseInt(e.target.value, 10))}
                   className="w-full accent-blue-600 cursor-pointer"
                 />
-                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-1">
+                  <span>2</span>
                   <span>10</span>
                   <span>30</span>
                   <span>50</span>

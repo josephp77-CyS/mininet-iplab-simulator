@@ -14,6 +14,7 @@ import {
   Sun,
   Moon,
   Trash2,
+  Sparkles,
 } from 'lucide-react';
 import { getCustomPresets, deleteCustomPreset } from '../../engine/dynamicLayoutEngine';
 
@@ -24,6 +25,7 @@ export const Navbar: React.FC = () => {
   const currentPresetId = useNetworkStore(state => state.currentPresetId);
   const loadPreset = useNetworkStore(state => state.loadPreset);
   const resetLab = useNetworkStore(state => state.resetLab);
+  const restoreCanonicalLinks = useNetworkStore(state => state.restoreCanonicalLinks);
   const nodes = useNetworkStore(state => state.nodes);
   const openTerminalTabs = useNetworkStore(state => state.openTerminalTabs);
   const setIsConfigModalOpen = useNetworkStore(state => state.setIsConfigModalOpen);
@@ -211,6 +213,16 @@ export const Navbar: React.FC = () => {
           title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
         >
           {isDarkMode ? <Sun size={16} className="text-amber-400" /> : <Moon size={16} className="text-slate-600" />}
+        </button>
+
+        {/* Restore Canonical Links Button */}
+        <button
+          onClick={restoreCanonicalLinks}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-md border border-slate-300 dark:border-slate-700 transition-colors cursor-pointer"
+          title="Restore standard canonical link wiring for this lab preset"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+          <span className="hidden xl:inline">Tidy Links</span>
         </button>
 
         {/* Reset Lab Button */}

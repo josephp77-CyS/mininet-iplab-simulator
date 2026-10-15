@@ -52,6 +52,7 @@ interface NetworkState {
   autoSnapOnCli: boolean;
   toggleAutoSnapOnCli: () => void;
   applyAutoLayout: () => void;
+  restoreCanonicalLinks: () => void;
 
   // Bulk Generator & Custom Presets
   generateBulkTopology: (
@@ -139,6 +140,17 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     const clonedNodes = { ...nodes };
     computeDynamicTopologyLayout(clonedNodes, links);
     set({ nodes: clonedNodes });
+  },
+
+  restoreCanonicalLinks: () => {
+    const { currentPresetId, nodes } = get();
+    if (currentPresetId === 'utp-exam-18' || Object.keys(nodes).length === 18) {
+      const preset = createUtpExamPreset(true);
+      set({ links: preset.links });
+    } else if (currentPresetId === 'static-routing-4' || Object.keys(nodes).length === 4) {
+      const preset = createStaticRoutingPreset();
+      set({ links: preset.links });
+    }
   },
 
   generateBulkTopology: (architecture, nodeCount) => {
@@ -357,12 +369,6 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       }
     }
 
-    // Subnet IP Auto-Wiring:
-    // If an IP address was assigned to any interface, connect nodes in the same subnet
-    const autoWired = checkAndAutoWireSubnets(activeTerminalNodeId, workingNodes, workingLinks);
-    if (autoWired.length > 0) {
-      workingLinks = [...workingLinks, ...autoWired];
-    }
 
     // Auto-Snap Position on CLI (if toggle is active)
     if (autoSnapOnCli) {

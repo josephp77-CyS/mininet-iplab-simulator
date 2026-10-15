@@ -1,5 +1,5 @@
 import { NetworkNode, NetworkLink } from './types';
-import { parseIpv4Cidr, parseIpv6Cidr, netmaskToPrefix } from './ipUtils';
+import { parseIpv4Cidr, parseIpv6Cidr, netmaskToPrefix, resolveInterfaceName } from './ipUtils';
 import { computeOspfNeighbors, computeOspfRoutes, getRouterId } from './ospfEngine';
 import { computeBgpNeighbors, computeBgpRoutes, getBgpRouterId } from './bgpEngine';
 import { parseOvsShow, setSwitchPortVlan, removeSwitchPortVlan } from './vlanEngine';
@@ -126,23 +126,15 @@ export function executeCommand(
 // HELPER: Interface Normalization & Dynamic Creation
 // -------------------------------------------------------------
 function resolveOrCreateInterface(node: NetworkNode, rawName: string): string {
-  let name = rawName;
-  // If user typed "eth1" on "r1", check if "r1-eth1" exists
+  const resolved = resolveInterfaceName(node, rawName);
+  if (node.interfaces[resolved]) {
+    return resolved;
+  }
+  let name = resolved;
+  if (!name.includes('-') && !name.toLowerCase().startsWith('lo') && /^eth\d+$/i.test(name)) {
+    name = `${node.name}-${name}`;
+  }
   if (!node.interfaces[name]) {
-    const candidate = `${node.name}-${name}`;
-    if (node.interfaces[candidate]) {
-      return candidate;
-    }
-    const match = Object.keys(node.interfaces).find(
-      k => k.toLowerCase() === name.toLowerCase() || k.toLowerCase().endsWith(name.toLowerCase())
-    );
-    if (match) {
-      return match;
-    }
-    // Dynamic interface creation if not found
-    if (!name.includes('-') && !name.toLowerCase().startsWith('lo')) {
-      name = `${node.name}-${name}`;
-    }
     node.interfaces[name] = {
       name,
       mac: `00:00:00:${Math.floor(Math.random() * 90 + 10)}:${Math.floor(Math.random() * 90 + 10)}:01`,
@@ -934,16 +926,8 @@ function handleHostCommand(
   if (cmd.match(/^ip\s+(addr|a)\s+add/i)) {
     const ipCidr = parts[3];
     const devIdx = parts.indexOf('dev');
-    let devName = devIdx !== -1 ? parts[devIdx + 1] : Object.keys(node.interfaces)[0] || `${node.name}-eth0`;
-
-    // Auto-create dev if missing
-    if (!node.interfaces[devName]) {
-      node.interfaces[devName] = {
-        name: devName,
-        mac: `00:00:00:${Math.floor(Math.random() * 90 + 10)}:${Math.floor(Math.random() * 90 + 10)}:04`,
-        up: true
-      };
-    }
+    const devRaw = devIdx !== -1 ? parts[devIdx + 1] : Object.keys(node.interfaces)[0] || `${node.name}-eth0`;
+    const devName = resolveOrCreateInterface(node, devRaw);
 
     if (ipCidr.includes(':')) {
       const parsed = parseIpv6Cidr(ipCidr);
@@ -967,7 +951,7 @@ function handleHostCommand(
   if (cmd.match(/^ip\s+(addr|a)\s+(del|flush)/i)) {
     const devIdx = parts.indexOf('dev');
     if (devIdx !== -1 && parts[devIdx + 1]) {
-      const devName = parts[devIdx + 1];
+      const devName = resolveInterfaceName(node, parts[devIdx + 1]);
       if (node.interfaces[devName]) {
         delete node.interfaces[devName].ip;
         delete node.interfaces[devName].ipv6;
@@ -980,15 +964,8 @@ function handleHostCommand(
   if (cmd.match(/^ip\s+-6\s+(addr|a)\s+add/i)) {
     const ipCidr = parts[4];
     const devIdx = parts.indexOf('dev');
-    let devName = devIdx !== -1 ? parts[devIdx + 1] : Object.keys(node.interfaces)[0] || `${node.name}-eth0`;
-
-    if (!node.interfaces[devName]) {
-      node.interfaces[devName] = {
-        name: devName,
-        mac: `00:00:00:${Math.floor(Math.random() * 90 + 10)}:${Math.floor(Math.random() * 90 + 10)}:04`,
-        up: true
-      };
-    }
+    const devRaw = devIdx !== -1 ? parts[devIdx + 1] : Object.keys(node.interfaces)[0] || `${node.name}-eth0`;
+    const devName = resolveOrCreateInterface(node, devRaw);
 
     const parsed = parseIpv6Cidr(ipCidr);
     if (parsed) {
@@ -1002,37 +979,44 @@ function handleHostCommand(
   // `ip link set <intf> up/down`
   if (cmd.match(/^ip\s+link\s+set/i)) {
     const devIdx = parts.indexOf('dev');
-    const dev = devIdx !== -1 ? parts[devIdx + 1] : parts[3];
+    const devRaw = devIdx !== -1 ? parts[devIdx + 1] : parts[3];
+    const dev = resolveInterfaceName(node, devRaw);
     const action = parts[parts.length - 1];
     if (node.interfaces[dev]) {
       node.interfaces[dev].up = action === 'up';
       return { output: '' };
     }
-    return { output: `Cannot find device "${dev}"`, type: 'error' };
+    return { output: `Cannot find device "${devRaw}"`, type: 'error' };
   }
 
-  // `ip route add default via <ip>`
-  if (cmd.match(/^ip\s+route\s+add\s+default\s+via/i)) {
-    node.defaultGateway = parts[4];
-    return { output: '' };
+  // `ip route add default via <ip>` / `ip route replace default via <ip>` / `route add default gw <ip>`
+  if (cmd.match(/^(ip\s+r(oute)?\s+(add|replace)\s+default\s+via|route\s+add\s+default\s+gw)/i)) {
+    const viaIdx = parts.findIndex(p => p.toLowerCase() === 'via' || p.toLowerCase() === 'gw');
+    if (viaIdx !== -1 && viaIdx + 1 < parts.length) {
+      node.defaultGateway = parts[viaIdx + 1];
+      return { output: '' };
+    }
   }
 
   // `ip route add <dest>/<prefix> via <next_hop>` or `ip route add <dest>/<prefix> dev <intf>`
-  if (cmd.match(/^ip\s+route\s+add\s+[\d\.]+\/\d+/i)) {
+  if (cmd.match(/^ip\s+r(oute)?\s+(add|replace)\s+[\d\.]+\/\d+/i)) {
     const p = parseIpv4Cidr(parts[3]);
     const viaIdx = parts.indexOf('via');
     const devIdx = parts.indexOf('dev');
     const nextHop = viaIdx !== -1 ? parts[viaIdx + 1] : devIdx !== -1 ? parts[devIdx + 1] : 'unknown';
+    const devName = devIdx !== -1 ? resolveInterfaceName(node, parts[devIdx + 1]) : undefined;
 
     if (p) {
-      node.staticRoutes = node.staticRoutes || [];
-      node.staticRoutes.push({ destination: p.network, prefix: p.prefix, nextHop });
+      node.staticRoutes = (node.staticRoutes || []).filter(
+        s => !(s.destination === p.network && s.prefix === p.prefix)
+      );
+      node.staticRoutes.push({ destination: p.network, prefix: p.prefix, nextHop, interfaceName: devName });
       return { output: '' };
     }
   }
 
   // `ip route del <prefix>` / `ip route del default`
-  if (cmd.match(/^ip\s+route\s+del/i)) {
+  if (cmd.match(/^ip\s+r(oute)?\s+del/i)) {
     if (cmd.includes('default')) {
       node.defaultGateway = undefined;
       return { output: '' };
@@ -1045,8 +1029,29 @@ function handleHostCommand(
   }
 
   // `ip -6 route add default via <gw>`
-  if (cmd.match(/^ip\s+-6\s+route\s+add\s+default\s+via/i)) {
-    return { output: '' };
+  if (cmd.match(/^ip\s+-6\s+r(oute)?\s+(add|replace)\s+default\s+via/i)) {
+    const viaIdx = parts.findIndex(p => p.toLowerCase() === 'via');
+    if (viaIdx !== -1 && viaIdx + 1 < parts.length) {
+      node.defaultGatewayV6 = parts[viaIdx + 1];
+      return { output: '' };
+    }
+  }
+
+  // `ip -6 route add <dest>/<prefix> via <gw>` or `dev <intf>`
+  if (cmd.match(/^ip\s+-6\s+r(oute)?\s+add/i)) {
+    const destCidr = parts[4];
+    const viaIdx = parts.indexOf('via');
+    const devIdx = parts.indexOf('dev');
+    const nextHop = viaIdx !== -1 ? parts[viaIdx + 1] : undefined;
+    const devName = devIdx !== -1 ? resolveInterfaceName(node, parts[devIdx + 1]) : undefined;
+    const p = parseIpv6Cidr(destCidr);
+    if (p) {
+      node.ipv6Routes = (node.ipv6Routes || []).filter(
+        r => !(r.destination === p.ip && r.prefix === p.prefix)
+      );
+      node.ipv6Routes.push({ destination: p.ip, prefix: p.prefix, nextHop, interfaceName: devName });
+      return { output: '' };
+    }
   }
 
   // `ip -6 route add <ipv6_prefix> dev <tun_name>` / `via <nexthop>`

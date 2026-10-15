@@ -17,6 +17,7 @@ export const RouterNode: React.FC<RouterNodeProps> = ({ data, selected }) => {
   const { node } = data;
   const selectNode = useNetworkStore(state => state.selectNode);
   const openTerminal = useNetworkStore(state => state.openTerminal);
+  const removeNode = useNetworkStore(state => state.removeNode);
 
   const isCore = node.role === 'core';
   const isSelected = selected;
@@ -32,16 +33,55 @@ export const RouterNode: React.FC<RouterNodeProps> = ({ data, selected }) => {
       {/* Floating Hover Tooltip */}
       <NodeTooltip node={node} />
 
-      {/* Centered Connection Handles for Straight Cable Paths */}
+      {/* Quick Delete Button on Selected Node */}
+      {isSelected && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            removeNode(node.id);
+          }}
+          className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center text-[10px] font-bold shadow-sm transition-all z-40 cursor-pointer"
+          title={`Hapus node ${node.name}`}
+        >
+          ✕
+        </button>
+      )}
+
+      {/* Interactive Drag Handles (Cardinal Ports, visible on hover) */}
       <Handle
-        type="target"
+        type="source"
         position={Position.Top}
-        className="!w-1 !h-1 !opacity-0 !border-none !pointer-events-none"
-        style={{ top: isCore ? '26px' : '24px', left: '50%', transform: 'translate(-50%, -50%)' }}
+        id="top"
+        className="!w-2.5 !h-2.5 !bg-blue-500 dark:!bg-blue-400 !border-2 !border-white dark:!border-slate-900 !rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30"
+        style={{ top: '-3px' }}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right"
+        className="!w-2.5 !h-2.5 !bg-blue-500 dark:!bg-blue-400 !border-2 !border-white dark:!border-slate-900 !rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30"
+        style={{ right: '-3px', top: isCore ? '26px' : '24px' }}
       />
       <Handle
         type="source"
         position={Position.Bottom}
+        id="bottom"
+        className="!w-2.5 !h-2.5 !bg-blue-500 dark:!bg-blue-400 !border-2 !border-white dark:!border-slate-900 !rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30"
+        style={{ bottom: '20px' }}
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="left"
+        className="!w-2.5 !h-2.5 !bg-blue-500 dark:!bg-blue-400 !border-2 !border-white dark:!border-slate-900 !rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30"
+        style={{ left: '-3px', top: isCore ? '26px' : '24px' }}
+      />
+
+      {/* Centered target/source handles for default straight-line edge routing */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="center"
         className="!w-1 !h-1 !opacity-0 !border-none !pointer-events-none"
         style={{ top: isCore ? '26px' : '24px', left: '50%', transform: 'translate(-50%, -50%)' }}
       />

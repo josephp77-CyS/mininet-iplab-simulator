@@ -1,5 +1,6 @@
 import { NetworkNode, NetworkLink, OspfNeighbor, RouteEntry } from './types';
-import { parseIpv4Cidr, isIpv4InSubnet, getNetworkAddress } from './ipUtils';
+import { parseIpv4Cidr, isIpv4InSubnet, getNetworkAddress, resolveInterfaceName } from './ipUtils';
+import { getReachableL3Neighbors } from './vlanEngine';
 
 export function getRouterId(node: NetworkNode): string {
   if (node.ospfRouterId) return node.ospfRouterId;
@@ -21,8 +22,9 @@ export function getRouterId(node: NetworkNode): string {
   return highestIp !== '0.0.0.0' ? highestIp : '1.1.1.1';
 }
 
-export function isInterfaceInOspf(node: NetworkNode, intfName: string): { inOspf: boolean; area?: number } {
+export function isInterfaceInOspf(node: NetworkNode, intfNameRaw: string): { inOspf: boolean; area?: number } {
   if (!node.ospfEnabled) return { inOspf: false };
+  const intfName = resolveInterfaceName(node, intfNameRaw);
   const intf = node.interfaces[intfName];
   if (!intf || !intf.ip || !intf.up) return { inOspf: false };
 
@@ -31,7 +33,8 @@ export function isInterfaceInOspf(node: NetworkNode, intfName: string): { inOspf
 
   for (const net of node.ospfNetworks) {
     if (isIpv4InSubnet(parsed.ip, net.network, net.prefix)) {
-      return { inOspf: true, area: net.area };
+      const normalizedArea = typeof net.area === 'string' && net.area === '0.0.0.0' ? 0 : Number(net.area) || 0;
+      return { inOspf: true, area: normalizedArea };
     }
   }
   return { inOspf: false };
@@ -44,62 +47,11 @@ export function findConnectedPeers(
   nodes: Record<string, NetworkNode>,
   links: NetworkLink[]
 ): Array<{ targetNodeId: string; targetIntfName: string }> {
-  const directPeers: Array<{ targetNodeId: string; targetIntfName: string }> = [];
-
-  for (const link of links) {
-    if (link.status === 'down') continue;
-    let peerNodeId = '';
-    let peerIntfName = '';
-
-    if (link.source === nodeId && link.sourceHandle === intfName) {
-      peerNodeId = link.target;
-      peerIntfName = link.targetHandle;
-    } else if (link.target === nodeId && link.targetHandle === intfName) {
-      peerNodeId = link.source;
-      peerIntfName = link.sourceHandle;
-    }
-
-    if (!peerNodeId) continue;
-
-    const peerNode = nodes[peerNodeId];
-    if (!peerNode) continue;
-
-    if (peerNode.type === 'switch') {
-      // Traverse switch respecting VLAN tags
-      const switchPort = peerNode.interfaces[peerIntfName];
-      const incomingVlan = switchPort?.vlanTag || 1; // default VLAN 1
-
-      for (const switchLink of links) {
-        if (switchLink.status === 'down') continue;
-        let otherNodeId = '';
-        let otherIntfName = '';
-        let otherSwitchPort = '';
-
-        if (switchLink.source === peerNodeId && switchLink.sourceHandle !== peerIntfName) {
-          otherSwitchPort = switchLink.sourceHandle;
-          otherNodeId = switchLink.target;
-          otherIntfName = switchLink.targetHandle;
-        } else if (switchLink.target === peerNodeId && switchLink.targetHandle !== peerIntfName) {
-          otherSwitchPort = switchLink.targetHandle;
-          otherNodeId = switchLink.source;
-          otherIntfName = switchLink.sourceHandle;
-        }
-
-        if (otherNodeId && otherNodeId !== nodeId) {
-          const outPort = peerNode.interfaces[otherSwitchPort];
-          const outVlan = outPort?.vlanTag || 1;
-          // Must match VLAN or trunk
-          if (incomingVlan === outVlan) {
-            directPeers.push({ targetNodeId: otherNodeId, targetIntfName: otherIntfName });
-          }
-        }
-      }
-    } else {
-      directPeers.push({ targetNodeId: peerNodeId, targetIntfName: peerIntfName });
-    }
-  }
-
-  return directPeers;
+  const reachable = getReachableL3Neighbors(nodeId, intfName, nodes, links);
+  return reachable.map(ep => ({
+    targetNodeId: ep.node.id,
+    targetIntfName: ep.interfaceName,
+  }));
 }
 
 // Compute OSPF Neighbors for a specific router
@@ -112,6 +64,7 @@ export function computeOspfNeighbors(
   if (!node || !node.ospfEnabled) return [];
 
   const neighbors: OspfNeighbor[] = [];
+  const visitedPeers = new Set<string>();
 
   for (const [intfName, intf] of Object.entries(node.interfaces)) {
     if (!intf.ip || !intf.up) continue;
@@ -127,10 +80,11 @@ export function computeOspfNeighbors(
       const peerNode = nodes[peer.targetNodeId];
       if (!peerNode || peerNode.type !== 'router' || !peerNode.ospfEnabled) continue;
 
-      const peerIntf = peerNode.interfaces[peer.targetIntfName];
+      const peerIntfName = resolveInterfaceName(peerNode, peer.targetIntfName);
+      const peerIntf = peerNode.interfaces[peerIntfName];
       if (!peerIntf || !peerIntf.ip || !peerIntf.up) continue;
 
-      const peerOspf = isInterfaceInOspf(peerNode, peer.targetIntfName);
+      const peerOspf = isInterfaceInOspf(peerNode, peerIntfName);
       if (!peerOspf.inOspf || peerOspf.area !== localOspf.area) continue;
 
       const peerParsed = parseIpv4Cidr(peerIntf.ip);
@@ -139,14 +93,17 @@ export function computeOspfNeighbors(
       // Check if both IPs are in the same subnet
       if (isIpv4InSubnet(peerParsed.ip, localParsed.network, localParsed.prefix)) {
         const neighborRouterId = getRouterId(peerNode);
-        neighbors.push({
-          neighborId: neighborRouterId,
-          priority: 1,
-          state: 'Full/DR',
-          deadTime: '00:00:36',
-          address: peerParsed.ip,
-          interfaceName: intfName,
-        });
+        if (!visitedPeers.has(neighborRouterId)) {
+          visitedPeers.add(neighborRouterId);
+          neighbors.push({
+            neighborId: neighborRouterId,
+            priority: 1,
+            state: 'Full/DR',
+            deadTime: '00:00:36',
+            address: peerParsed.ip,
+            interfaceName: intfName,
+          });
+        }
       }
     }
   }
@@ -207,10 +164,11 @@ export function computeOspfRoutes(
         const peerNode = nodes[peer.targetNodeId];
         if (!peerNode || !unvisited.has(peerNode.id) || !peerNode.ospfEnabled) continue;
 
-        const peerIntf = peerNode.interfaces[peer.targetIntfName];
+        const peerIntfName = resolveInterfaceName(peerNode, peer.targetIntfName);
+        const peerIntf = peerNode.interfaces[peerIntfName];
         if (!peerIntf || !peerIntf.ip || !peerIntf.up) continue;
 
-        const peerOspf = isInterfaceInOspf(peerNode, peer.targetIntfName);
+        const peerOspf = isInterfaceInOspf(peerNode, peerIntfName);
         if (!peerOspf.inOspf || peerOspf.area !== currentOspf.area) continue;
 
         const peerParsed = parseIpv4Cidr(peerIntf.ip);
@@ -262,7 +220,6 @@ export function computeOspfRoutes(
 
       const netKey = `${parsed.network}/${parsed.prefix}`;
       if (!localNetworks.has(netKey)) {
-        // Only add if not already in route list with lower metric
         const existingIdx = ospfRoutes.findIndex(rt => rt.destination === parsed.network && rt.prefix === parsed.prefix);
         const metric = distances[r.id];
 

@@ -113,3 +113,47 @@ export function isIpv6InSubnet(ip: string, netPrefix: string, prefixLen: number)
   const hexCharsToCheck = Math.floor(prefixLen / 4);
   return expIp.slice(0, hexCharsToCheck) === expNet.slice(0, hexCharsToCheck);
 }
+
+export function resolveInterfaceName(
+  node: { id: string; name?: string; interfaces: Record<string, any> },
+  rawName: string
+): string {
+  const clean = rawName.trim();
+  if (!clean) return clean;
+  if (clean === 'lo' || clean === 'loopback' || clean === 'lo0') return 'lo';
+
+  // 1. Exact match in existing interfaces
+  if (node.interfaces[clean]) return clean;
+
+  const nodeName = node.name || node.id;
+
+  // 2. Try prefixed match: e.g. user typed "eth0" on "c11" -> check "c11-eth0"
+  const prefixedId = `${node.id}-${clean}`;
+  if (node.interfaces[prefixedId]) return prefixedId;
+
+  const prefixedName = `${nodeName}-${clean}`;
+  if (node.interfaces[prefixedName]) return prefixedName;
+
+  // 3. Try stripped match: e.g. user typed "c11-eth0" -> check "eth0"
+  const prefixPattern = new RegExp(`^(${node.id}|${nodeName})[-_]`, 'i');
+  const stripped = clean.replace(prefixPattern, '');
+  if (node.interfaces[stripped]) return stripped;
+
+  // 4. Try suffix match in keys: e.g. "eth1" matches any key ending in "-eth1" or "_eth1"
+  const match = Object.keys(node.interfaces).find(
+    k =>
+      k.toLowerCase() === clean.toLowerCase() ||
+      k.toLowerCase().endsWith(`-${clean.toLowerCase()}`) ||
+      k.toLowerCase().endsWith(`_${clean.toLowerCase()}`)
+  );
+  if (match) return match;
+
+  // 5. Default convention: if it starts with eth, prefix with node.name/id if existing interfaces use prefix convention
+  const firstKey = Object.keys(node.interfaces)[0];
+  if (/^eth\d+$/i.test(clean) && firstKey && (firstKey.startsWith(`${node.id}-`) || firstKey.startsWith(`${nodeName}-`))) {
+    return `${nodeName}-${clean.toLowerCase()}`;
+  }
+
+  return clean;
+}
+
