@@ -46,6 +46,22 @@ export const HostNode: React.FC<HostNodeProps> = ({ data, selected }) => {
         </button>
       )}
 
+      {/* Primary Center Handles for razor-straight center-to-center edge routing */}
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="center"
+        className="!w-1 !h-1 !opacity-0 !border-none !pointer-events-none"
+        style={{ top: '24px', left: '50%', transform: 'translate(-50%, -50%)' }}
+      />
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="center"
+        className="!w-1 !h-1 !opacity-0 !border-none !pointer-events-none"
+        style={{ top: '24px', left: '50%', transform: 'translate(-50%, -50%)' }}
+      />
+
       {/* Interactive Drag Handles (Cardinal Ports, visible on hover) */}
       <Handle
         type="source"
@@ -74,15 +90,6 @@ export const HostNode: React.FC<HostNodeProps> = ({ data, selected }) => {
         id="left"
         className="!w-2.5 !h-2.5 !bg-emerald-600 !border-2 !border-white dark:!border-slate-900 !rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30"
         style={{ left: '-3px', top: '24px' }}
-      />
-
-      {/* Centered target handle for straight cables */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="center"
-        className="!w-1 !h-1 !opacity-0 !border-none !pointer-events-none"
-        style={{ top: '24px', left: '50%', transform: 'translate(-50%, -50%)' }}
       />
 
       {/* Clean 48px Rounded Square in Emerald Green */}

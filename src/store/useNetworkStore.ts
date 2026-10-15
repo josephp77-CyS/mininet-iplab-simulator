@@ -125,7 +125,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
   terminalWidth: 480,
   isDarkMode: false,
 
-  autoSnapOnCli: true,
+  autoSnapOnCli: false,
 
   isConfigModalOpen: false,
   isVerificationModalOpen: false,

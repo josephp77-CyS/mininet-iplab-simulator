@@ -55,12 +55,14 @@ export const NetworkCanvas: React.FC = () => {
     }));
   }, [nodes, selectedNodeId]);
 
-  // Convert zustand links to React Flow edges (Straight lines)
+  // Convert zustand links to React Flow edges (Straight lines from center to center)
   const flowEdges: Edge[] = useMemo(() => {
     return links.map(link => ({
       id: link.id,
       source: link.source,
       target: link.target,
+      sourceHandle: 'center',
+      targetHandle: 'center',
       type: 'straight',
       style: { stroke: '#64748b', strokeWidth: 2 },
       data: {

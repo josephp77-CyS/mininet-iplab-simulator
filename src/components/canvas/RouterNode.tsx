@@ -47,6 +47,22 @@ export const RouterNode: React.FC<RouterNodeProps> = ({ data, selected }) => {
         </button>
       )}
 
+      {/* Primary Center Handles for razor-straight center-to-center edge routing */}
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="center"
+        className="!w-1 !h-1 !opacity-0 !border-none !pointer-events-none"
+        style={{ top: isCore ? '26px' : '24px', left: '50%', transform: 'translate(-50%, -50%)' }}
+      />
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="center"
+        className="!w-1 !h-1 !opacity-0 !border-none !pointer-events-none"
+        style={{ top: isCore ? '26px' : '24px', left: '50%', transform: 'translate(-50%, -50%)' }}
+      />
+
       {/* Interactive Drag Handles (Cardinal Ports, visible on hover) */}
       <Handle
         type="source"
@@ -75,15 +91,6 @@ export const RouterNode: React.FC<RouterNodeProps> = ({ data, selected }) => {
         id="left"
         className="!w-2.5 !h-2.5 !bg-blue-500 dark:!bg-blue-400 !border-2 !border-white dark:!border-slate-900 !rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-crosshair z-30"
         style={{ left: '-3px', top: isCore ? '26px' : '24px' }}
-      />
-
-      {/* Centered target/source handles for default straight-line edge routing */}
-      <Handle
-        type="target"
-        position={Position.Top}
-        id="center"
-        className="!w-1 !h-1 !opacity-0 !border-none !pointer-events-none"
-        style={{ top: isCore ? '26px' : '24px', left: '50%', transform: 'translate(-50%, -50%)' }}
       />
 
       {/* Clean Circular Node (Core 52px, Edge 48px) */}
