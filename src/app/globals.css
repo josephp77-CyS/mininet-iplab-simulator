@@ -56,3 +56,9 @@ body {
   transition: none !important;
 }
 
+/* Invisible pointer when inspecting cable/dot */
+.cursor-none,
+.cursor-none * {
+  cursor: none !important;
+}
+

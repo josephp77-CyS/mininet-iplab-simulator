@@ -48,7 +48,32 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   data,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleMouseEnter = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 140);
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Access network store for live node and interface details
   const nodes = useNetworkStore(state => state.nodes);
@@ -268,45 +293,20 @@ export const CustomEdge: React.FC<EdgeProps> = ({
       return <SwitchIcon className="w-3.5 h-3.5 shrink-0 text-amber-500" />;
     }
     return <Monitor className="w-3.5 h-3.5 shrink-0 text-emerald-500" />;
-  };
-
-  // Smart Tooltip Clamping Position following Cursor
-  let tooltipLeft = (mousePos?.x ?? 0) + 16;
-  let tooltipTop = (mousePos?.y ?? 0) - 20;
-  if (typeof window !== 'undefined') {
-    const cardWidth = 330;
-    const cardHeight = 260;
-    if (tooltipLeft + cardWidth > window.innerWidth - 10) {
-      tooltipLeft = (mousePos?.x ?? 0) - cardWidth - 14;
-    }
-    if (tooltipTop + cardHeight > window.innerHeight - 10) {
-      tooltipTop = (mousePos?.y ?? 0) - cardHeight - 10;
-    }
-    if (tooltipTop < 60) {
-      tooltipTop = 60;
-    }
-  }
+  };  const isNearTop = labelY < 290;
 
   return (
     <>
-      {/* Invisible wider stroke (24px hit area) for smooth, effortless hover trigger */}
+      {/* Invisible wider stroke (28px hit area) for smooth, effortless hover trigger */}
       <path
         d={edgePath}
         fill="none"
         strokeOpacity={0}
-        strokeWidth={24}
-        className="cursor-pointer"
-        onMouseEnter={(e) => {
-          setIsHovered(true);
-          setMousePos({ x: e.clientX, y: e.clientY });
-        }}
-        onMouseMove={(e) => {
-          setMousePos({ x: e.clientX, y: e.clientY });
-        }}
-        onMouseLeave={() => {
-          setIsHovered(false);
-          setMousePos(null);
-        }}
+        strokeWidth={28}
+        className="cursor-none"
+        style={{ cursor: 'none' }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       />
 
       {/* Solid straight cable with smooth luminous hover glow */}
@@ -314,9 +314,10 @@ export const CustomEdge: React.FC<EdgeProps> = ({
         id={id}
         path={edgePath}
         markerEnd={markerEnd}
-        className="react-flow__edge-path"
+        className="react-flow__edge-path cursor-none"
         style={{
           ...style,
+          cursor: 'none',
           stroke: isUp 
             ? (isHovered ? (isDarkMode ? '#60a5fa' : '#2563eb') : (isDarkMode ? '#475569' : '#64748b'))
             : '#ef4444',
@@ -333,159 +334,174 @@ export const CustomEdge: React.FC<EdgeProps> = ({
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             pointerEvents: 'all',
+            cursor: 'none',
+            zIndex: isHovered ? 99999 : 20,
           }}
-          className="z-20 flex items-center justify-center cursor-pointer"
-          onMouseEnter={(e) => {
-            setIsHovered(true);
-            setMousePos({ x: e.clientX, y: e.clientY });
-          }}
-          onMouseMove={(e) => {
-            setMousePos({ x: e.clientX, y: e.clientY });
-          }}
-          onMouseLeave={() => {
-            setIsHovered(false);
-            setMousePos(null);
-          }}
+          className="flex items-center justify-center cursor-none select-none"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
+          {/* Animated beacon glow ring when hovered */}
+          {isHovered && (
+            <span className="absolute w-6 h-6 rounded-full bg-blue-500/35 animate-ping pointer-events-none" />
+          )}
+
+          {/* Guide Dot Body */}
           <div
-            className={`transition-all duration-150 flex items-center justify-center rounded-full cursor-pointer ${
+            className={`transition-all duration-150 flex items-center justify-center rounded-full cursor-none relative z-10 ${
               isHovered
-                ? 'w-3.5 h-3.5 bg-blue-500 ring-4 ring-blue-500/25 shadow-md'
-                : 'w-2 h-2 bg-slate-400 dark:bg-slate-500 border border-white dark:border-slate-800 shadow-xs hover:scale-150 hover:bg-blue-500'
+                ? 'w-4 h-4 bg-blue-600 ring-4 ring-blue-500/30 shadow-lg shadow-blue-500/50'
+                : 'w-2.5 h-2.5 bg-slate-400 dark:bg-slate-500 border border-white dark:border-slate-800 shadow-xs hover:scale-125 hover:bg-blue-500'
             }`}
             title="Sorot kabel untuk inspeksi koneksi & troubleshooting"
           >
-            {isHovered && <span className="w-1 h-1 rounded-full bg-white" />}
+            {isHovered && <span className="w-1.5 h-1.5 rounded-full bg-white shadow-xs" />}
           </div>
-        </div>
-      </EdgeLabelRenderer>
 
-      {/* Comprehensive Educational Diagnostics & Fix Guide Card anchored to Pointer */}
-      {isHovered && mousePos && (
-        <EdgeLabelRenderer>
-          <div
-            style={{
-              position: 'fixed',
-              left: `${tooltipLeft}px`,
-              top: `${tooltipTop}px`,
-              pointerEvents: 'none',
-              zIndex: 99999,
-            }}
-            className="select-none transition-all duration-75 animate-in fade-in zoom-in-95 duration-100"
-          >
+          {/* Comprehensive Educational Diagnostics & Fix Guide Card anchored EXACTLY to the Guide Dot */}
+          {isHovered && (
             <div
-              className={`w-[325px] sm:w-[340px] p-2.5 rounded-xl shadow-2xl border backdrop-blur-md text-xs leading-normal ${
-                isDarkMode
-                  ? 'bg-slate-900/95 text-slate-100 border-slate-700/80 shadow-slate-950/70'
-                  : 'bg-white/95 text-slate-900 border-slate-200/90 shadow-slate-400/25'
-              }`}
+              style={{
+                position: 'absolute',
+                [isNearTop ? 'top' : 'bottom']: 'calc(100% + 14px)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                cursor: 'none',
+                pointerEvents: 'auto',
+                zIndex: 99999,
+              }}
+              className="cursor-none select-none transition-all duration-75 animate-in fade-in zoom-in-95 duration-100"
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
             >
-              {/* Header: Device A ⟷ Device B */}
-              <div className="flex items-center justify-between border-b pb-1.5 mb-2 border-slate-200/80 dark:border-slate-800">
-                <div className="flex items-center gap-1.5 font-bold text-[11px] truncate max-w-[130px]">
-                  {renderDeviceIcon(sourceNode?.type, sourceNode?.role)}
-                  <span className="font-mono">{sourceNode?.name || source}</span>
-                  <span className="text-[10px] text-slate-400 font-normal truncate">
-                    ({resolvedSourcePort.replace(`${sourceNode?.name}-`, '')})
-                  </span>
-                </div>
+              {/* Pointer Caret aiming directly at the Guide Dot */}
+              {isNearTop ? (
+                <>
+                  <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-x-[8px] border-x-transparent border-b-[8px] border-b-slate-200/90 dark:border-b-slate-700/80 pointer-events-none" />
+                  <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-x-[7px] border-x-transparent border-b-[7px] border-b-white/95 dark:border-b-slate-900/95 pointer-events-none" />
+                </>
+              ) : (
+                <>
+                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-x-[8px] border-x-transparent border-t-[8px] border-t-slate-200/90 dark:border-t-slate-700/80 pointer-events-none" />
+                  <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-0 h-0 border-x-[7px] border-x-transparent border-t-[7px] border-t-white/95 dark:border-t-slate-900/95 pointer-events-none" />
+                </>
+              )}
 
-                <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-mono shrink-0">
-                  <ArrowLeftRight className="w-3 h-3 text-blue-500" />
-                  <span>{edgeData.latency ? `${edgeData.latency}ms` : 'Link'}</span>
-                </div>
-
-                <div className="flex items-center gap-1.5 font-bold text-[11px] truncate max-w-[130px]">
-                  {renderDeviceIcon(targetNode?.type, targetNode?.role)}
-                  <span className="font-mono">{targetNode?.name || target}</span>
-                  <span className="text-[10px] text-slate-400 font-normal truncate">
-                    ({resolvedTargetPort.replace(`${targetNode?.name}-`, '')})
-                  </span>
-                </div>
-              </div>
-
-              {/* Addressing Grid */}
-              <div className="grid grid-cols-2 gap-2 text-[10px] font-mono mb-2">
-                <div className="bg-slate-50/90 dark:bg-slate-800/60 p-1.5 rounded-lg border border-slate-200/70 dark:border-slate-700/50">
-                  <div className="text-slate-400 text-[9px] mb-0.5 truncate">{resolvedSourcePort}</div>
-                  <div className="font-semibold text-slate-800 dark:text-slate-100 truncate">
-                    {sourceIntf?.ip || (sourceNode?.type === 'switch' && sourceIntf?.vlanTag ? `VLAN ${sourceIntf.vlanTag}` : <span className="text-amber-500 italic">No IP</span>)}
-                  </div>
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    Status: <span className={sourceIntf?.up !== false ? 'text-emerald-500 font-bold' : 'text-rose-500 font-bold'}>{sourceIntf?.up !== false ? 'UP' : 'DOWN'}</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50/90 dark:bg-slate-800/60 p-1.5 rounded-lg border border-slate-200/70 dark:border-slate-700/50">
-                  <div className="text-slate-400 text-[9px] mb-0.5 truncate">{resolvedTargetPort}</div>
-                  <div className="font-semibold text-slate-800 dark:text-slate-100 truncate">
-                    {targetIntf?.ip || (targetNode?.type === 'switch' && targetIntf?.vlanTag ? `VLAN ${targetIntf.vlanTag}` : <span className="text-amber-500 italic">No IP</span>)}
-                  </div>
-                  <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    Status: <span className={targetIntf?.up !== false ? 'text-emerald-500 font-bold' : 'text-rose-500 font-bold'}>{targetIntf?.up !== false ? 'UP' : 'DOWN'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* SECTION: Mengapa Berhasil / Mengapa Error */}
+              {/* Main Card Container */}
               <div
-                className={`p-2 rounded-lg border text-[11px] mb-2 ${
-                  diag.status === 'success'
-                    ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/70 text-emerald-900 dark:text-emerald-200'
-                    : diag.status === 'error'
-                    ? 'bg-rose-50/90 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/70 text-rose-900 dark:text-rose-200'
-                    : diag.status === 'warning'
-                    ? 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/70 text-amber-900 dark:text-amber-200'
-                    : 'bg-blue-50/90 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/70 text-blue-900 dark:text-blue-200'
+                className={`w-[330px] sm:w-[350px] p-2.5 rounded-xl shadow-2xl border backdrop-blur-md text-xs leading-normal cursor-none ${
+                  isDarkMode
+                    ? 'bg-slate-900/95 text-slate-100 border-slate-700/80 shadow-slate-950/70'
+                    : 'bg-white/95 text-slate-900 border-slate-200/90 shadow-slate-400/25'
                 }`}
               >
-                <div className="flex items-center gap-1.5 font-bold mb-1">
-                  {diag.status === 'success' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />}
-                  {diag.status === 'error' && <XCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />}
-                  {diag.status === 'warning' && <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />}
-                  {diag.status === 'info' && <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />}
-                  <span className="truncate">{diag.title}</span>
-                </div>
-
-                <div className="text-[10px] leading-relaxed opacity-95 whitespace-pre-line">
-                  {diag.whySuccess || diag.whyError}
-                </div>
-              </div>
-
-              {/* SECTION: Panduan & Cara Memperbaiki (Jika ada Error / Warning) */}
-              {(diag.fixCommands || diag.fixSteps) && (
-                <div className="p-2 rounded-lg bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-[10px]">
-                  <div className="flex items-center gap-1 font-bold text-slate-700 dark:text-slate-200 mb-1">
-                    <Wrench className="w-3 h-3 text-blue-500" />
-                    <span>Panduan Perbaikan ({diag.fixTargetDevice}):</span>
+                {/* Header: Device A ⟷ Device B */}
+                <div className="flex items-center justify-between border-b pb-1.5 mb-2 border-slate-200/80 dark:border-slate-800">
+                  <div className="flex items-center gap-1.5 font-bold text-[11px] truncate max-w-[130px]">
+                    {renderDeviceIcon(sourceNode?.type, sourceNode?.role)}
+                    <span className="font-mono">{sourceNode?.name || source}</span>
+                    <span className="text-[10px] text-slate-400 font-normal truncate">
+                      ({resolvedSourcePort.replace(`${sourceNode?.name}-`, '')})
+                    </span>
                   </div>
 
-                  {diag.fixSteps && diag.fixSteps.length > 0 && (
-                    <ul className="list-disc list-inside space-y-0.5 text-slate-600 dark:text-slate-300 mb-1.5 opacity-90">
-                      {diag.fixSteps.map((step, idx) => (
-                        <li key={idx} className="leading-tight">{step}</li>
-                      ))}
-                    </ul>
-                  )}
+                  <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-mono shrink-0">
+                    <ArrowLeftRight className="w-3 h-3 text-blue-500" />
+                    <span>{edgeData.latency ? `${edgeData.latency}ms` : 'Link'}</span>
+                  </div>
 
-                  {diag.fixCommands && diag.fixCommands.length > 0 && (
-                    <div className="space-y-0.5">
-                      <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">Perintah CLI untuk dijalankan:</div>
-                      <div className="bg-slate-950 text-emerald-400 p-1.5 rounded-md font-mono text-[9.5px] space-y-0.5 border border-slate-800 shadow-inner overflow-x-auto">
-                        {diag.fixCommands.map((cmd, idx) => (
-                          <div key={idx} className="leading-tight select-all">
-                            {cmd}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1.5 font-bold text-[11px] truncate max-w-[130px]">
+                    {renderDeviceIcon(targetNode?.type, targetNode?.role)}
+                    <span className="font-mono">{targetNode?.name || target}</span>
+                    <span className="text-[10px] text-slate-400 font-normal truncate">
+                      ({resolvedTargetPort.replace(`${targetNode?.name}-`, '')})
+                    </span>
+                  </div>
                 </div>
-              )}
+
+                {/* Addressing Grid */}
+                <div className="grid grid-cols-2 gap-2 text-[10px] font-mono mb-2">
+                  <div className="bg-slate-50/90 dark:bg-slate-800/60 p-1.5 rounded-lg border border-slate-200/70 dark:border-slate-700/50">
+                    <div className="text-slate-400 text-[9px] mb-0.5 truncate">{resolvedSourcePort}</div>
+                    <div className="font-semibold text-slate-800 dark:text-slate-100 truncate">
+                      {sourceIntf?.ip || (sourceNode?.type === 'switch' && sourceIntf?.vlanTag ? `VLAN ${sourceIntf.vlanTag}` : <span className="text-amber-500 italic">No IP</span>)}
+                    </div>
+                    <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Status: <span className={sourceIntf?.up !== false ? 'text-emerald-500 font-bold' : 'text-rose-500 font-bold'}>{sourceIntf?.up !== false ? 'UP' : 'DOWN'}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50/90 dark:bg-slate-800/60 p-1.5 rounded-lg border border-slate-200/70 dark:border-slate-700/50">
+                    <div className="text-slate-400 text-[9px] mb-0.5 truncate">{resolvedTargetPort}</div>
+                    <div className="font-semibold text-slate-800 dark:text-slate-100 truncate">
+                      {targetIntf?.ip || (targetNode?.type === 'switch' && targetIntf?.vlanTag ? `VLAN ${targetIntf.vlanTag}` : <span className="text-amber-500 italic">No IP</span>)}
+                    </div>
+                    <div className="text-[9px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      Status: <span className={targetIntf?.up !== false ? 'text-emerald-500 font-bold' : 'text-rose-500 font-bold'}>{targetIntf?.up !== false ? 'UP' : 'DOWN'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION: Mengapa Berhasil / Mengapa Error */}
+                <div
+                  className={`p-2 rounded-lg border text-[11px] mb-2 ${
+                    diag.status === 'success'
+                      ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/70 text-emerald-900 dark:text-emerald-200'
+                      : diag.status === 'error'
+                      ? 'bg-rose-50/90 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800/70 text-rose-900 dark:text-rose-200'
+                      : diag.status === 'warning'
+                      ? 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/70 text-amber-900 dark:text-amber-200'
+                      : 'bg-blue-50/90 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/70 text-blue-900 dark:text-blue-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-bold mb-1">
+                    {diag.status === 'success' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />}
+                    {diag.status === 'error' && <XCircle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />}
+                    {diag.status === 'warning' && <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />}
+                    {diag.status === 'info' && <Info className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />}
+                    <span className="truncate">{diag.title}</span>
+                  </div>
+
+                  <div className="text-[10px] leading-relaxed opacity-95 whitespace-pre-line">
+                    {diag.whySuccess || diag.whyError}
+                  </div>
+                </div>
+
+                {/* SECTION: Panduan & Cara Memperbaiki (Jika ada Error / Warning) */}
+                {(diag.fixCommands || diag.fixSteps) && (
+                  <div className="p-2 rounded-lg bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 text-[10px]">
+                    <div className="flex items-center gap-1 font-bold text-slate-700 dark:text-slate-200 mb-1">
+                      <Wrench className="w-3 h-3 text-blue-500" />
+                      <span>Panduan Perbaikan ({diag.fixTargetDevice}):</span>
+                    </div>
+
+                    {diag.fixSteps && diag.fixSteps.length > 0 && (
+                      <ul className="list-disc list-inside space-y-0.5 text-slate-600 dark:text-slate-300 mb-1.5 opacity-90">
+                        {diag.fixSteps.map((step, idx) => (
+                          <li key={idx} className="leading-tight">{step}</li>
+                        ))}
+                      </ul>
+                    )}
+
+                    {diag.fixCommands && diag.fixCommands.length > 0 && (
+                      <div className="space-y-0.5">
+                        <div className="text-[9px] text-slate-400 font-semibold uppercase tracking-wider">Perintah CLI untuk dijalankan:</div>
+                        <div className="bg-slate-950 text-emerald-400 p-1.5 rounded-md font-mono text-[9.5px] space-y-0.5 border border-slate-800 shadow-inner overflow-x-auto">
+                          {diag.fixCommands.map((cmd, idx) => (
+                            <div key={idx} className="leading-tight select-all">
+                              {cmd}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        </EdgeLabelRenderer>
-      )}
+          )}
+        </div>
+      </EdgeLabelRenderer>
     </>
   );
 };
