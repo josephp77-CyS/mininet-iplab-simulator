@@ -41,7 +41,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   const nodes = useNetworkStore(state => state.nodes);
   const isDarkMode = useNetworkStore(state => state.isDarkMode);
 
-  const [edgePath] = getStraightPath({
+  const [edgePath, labelX, labelY] = getStraightPath({
     sourceX,
     sourceY,
     targetX,
@@ -201,6 +201,40 @@ export const CustomEdge: React.FC<EdgeProps> = ({
           transition: 'stroke 0.15s, stroke-width 0.15s, filter 0.15s',
         }}
       />
+
+      {/* Midpoint Target Guide Bead / Dot on the wire */}
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+          }}
+          className="z-20 flex items-center justify-center cursor-pointer"
+          onMouseEnter={(e) => {
+            setIsHovered(true);
+            setMousePos({ x: e.clientX, y: e.clientY });
+          }}
+          onMouseMove={(e) => {
+            setMousePos({ x: e.clientX, y: e.clientY });
+          }}
+          onMouseLeave={() => {
+            setIsHovered(false);
+            setMousePos(null);
+          }}
+        >
+          <div
+            className={`transition-all duration-150 flex items-center justify-center rounded-full cursor-pointer ${
+              isHovered
+                ? 'w-3.5 h-3.5 bg-blue-500 ring-4 ring-blue-500/25 shadow-md'
+                : 'w-2 h-2 bg-slate-400 dark:bg-slate-500 border border-white dark:border-slate-800 shadow-xs hover:scale-150 hover:bg-blue-500'
+            }`}
+            title="Sorot kabel untuk inspeksi koneksi & troubleshooting"
+          >
+            {isHovered && <span className="w-1 h-1 rounded-full bg-white" />}
+          </div>
+        </div>
+      </EdgeLabelRenderer>
 
       {/* Lightweight, Non-Intrusive HUD Tooltip Anchored Precisely to Pointer */}
       {isHovered && mousePos && (
