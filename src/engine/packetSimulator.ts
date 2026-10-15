@@ -233,14 +233,50 @@ export function simulatePing(
     };
   }
 
-  // Identify source IP for return path validation
+  // Identify source IP for return path validation:
+  // 1. Prefer interface on sourceNode in the same subnet as targetIp
   let sourceIp = '';
   for (const intf of Object.values(sourceNode.interfaces)) {
-    if (intf.up && (isIpv6 ? intf.ipv6 : intf.ip)) {
-      const p = isIpv6 ? parseIpv6Cidr(intf.ipv6!) : parseIpv4Cidr(intf.ip!);
-      if (p) {
+    if (!intf.up) continue;
+    if (!isIpv6 && intf.ip) {
+      const p = parseIpv4Cidr(intf.ip);
+      if (p && isIpv4InSubnet(targetIp, p.network, p.prefix)) {
         sourceIp = p.ip;
         break;
+      }
+    } else if (isIpv6 && intf.ipv6) {
+      const p = parseIpv6Cidr(intf.ipv6);
+      if (p && isIpv6InSubnet(targetIp, p.ip, p.prefix)) {
+        sourceIp = p.ip;
+        break;
+      }
+    }
+  }
+
+  // 2. If no direct subnet match, pick first physical non-loopback interface
+  if (!sourceIp) {
+    for (const intf of Object.values(sourceNode.interfaces)) {
+      if (!intf.up || intf.name === 'lo') continue;
+      if (!isIpv6 && intf.ip) {
+        const p = parseIpv4Cidr(intf.ip);
+        if (p) { sourceIp = p.ip; break; }
+      } else if (isIpv6 && intf.ipv6) {
+        const p = parseIpv6Cidr(intf.ipv6);
+        if (p) { sourceIp = p.ip; break; }
+      }
+    }
+  }
+
+  // 3. Fallback to any interface (including lo)
+  if (!sourceIp) {
+    for (const intf of Object.values(sourceNode.interfaces)) {
+      if (!intf.up) continue;
+      if (!isIpv6 && intf.ip) {
+        const p = parseIpv4Cidr(intf.ip);
+        if (p) { sourceIp = p.ip; break; }
+      } else if (isIpv6 && intf.ipv6) {
+        const p = parseIpv6Cidr(intf.ipv6);
+        if (p) { sourceIp = p.ip; break; }
       }
     }
   }
